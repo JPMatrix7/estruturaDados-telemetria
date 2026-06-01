@@ -1,48 +1,79 @@
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
- * Implementacao concreta do SGBD para o Grupo 07 (Telemetria IoT).
+ * Implementação concreta do {@link SGBD} para o domínio do Grupo 07
+ * (Telemetria IoT). Coordena as estruturas em memória com a camada de
+ * persistência.
  *
- * Mantem duas estruturas em memoria:
- *   - HashMap<String,String>: acesso direto por timestamp (chave -> valor);
- *   - BST (NoBST) indexada por timestamp: indice ordenado por tempo, usado
- *     pela consulta de soma em faixa.
+ * <p><strong>Estruturas em memória.</strong></p>
+ * <ul>
+ *   <li>{@link HashMap}{@code <String,String>} — índice primário, oferece
+ *       acesso direto por timestamp ({@code get} em O(1) médio);</li>
+ *   <li>{@link NoBST} — índice secundário ordenado por timestamp, usado pela
+ *       consulta de soma em faixa ({@link #consultarSoma(int, int)}).</li>
+ * </ul>
  *
- * A durabilidade vem do log append-only: cada put/delete e registrado em
- * disco e, ao iniciar, o estado e reconstruido relendo o log.
+ * <p><strong>Durabilidade e reconstrução.</strong> Toda gravação e remoção é
+ * primeiro registrada no {@link LogAppendOnly} e só então aplicada às
+ * estruturas em memória. Ao ser construída, a instância relê o log e reaplica
+ * os registros em ordem, reconstruindo fielmente o estado anterior ao
+ * encerramento — garantindo que a memória reflita o conteúdo persistido.</p>
+ *
+ * <p><strong>Remoção.</strong> Conforme a seção 4.2 do enunciado, a remoção
+ * física na BST não é exigida: {@link #delete(String)} remove apenas do
+ * {@code HashMap}; o nó correspondente permanece na BST.</p>
+ *
+ * @author Grupo 07 — Telemetria IoT
  */
 public class Telemetria implements SGBD {
 
-    private final Map<String, String> mapa;
+    /** Índice primário: timestamp (String) -> leitura (String). */
+    private final Map<String, String> indicePrimario;
+    /** Índice secundário ordenado por timestamp; {@code null} se vazio. */
     private NoBST raizBST;
+    /** Camada de persistência durável. */
     private final LogAppendOnly log;
 
+    /**
+     * Abre o banco no caminho de log informado e reconstrói o estado a partir
+     * dos registros já persistidos.
+     *
+     * @param caminhoLog caminho do arquivo de log; não pode ser {@code null}
+     */
     public Telemetria(String caminhoLog) {
-        this.mapa = new HashMap<>();
+        this.indicePrimario = new HashMap<>();
         this.raizBST = null;
         this.log = new LogAppendOnly(caminhoLog);
         reconstruir();
     }
 
-    /** Reaplica os registros do log para reconstruir o estado em memoria. */
+    /**
+     * Reaplica, em ordem cronológica, todos os registros do log, reconstruindo
+     * os índices primário e secundário.
+     */
     private void reconstruir() {
         List<RegistroLog> registros = log.lerTudo();
-        for (RegistroLog reg : registros) {
-            if (reg.getTipo() == TipoOperacao.PUT) {
-                mapa.put(reg.getChave(), reg.getValor());
-                indexarNaBST(reg.getChave(), reg.getValor());
+        for (RegistroLog registro : registros) {
+            if (registro.getTipo() == TipoOperacao.PUT) {
+                indicePrimario.put(registro.getChave(), registro.getValor());
+                indexarNaBST(registro.getChave(), registro.getValor());
             } else { // DEL
-                mapa.remove(reg.getChave());
-                // A BST nao exige remocao fisica; o no pode ser mantido.
+                indicePrimario.remove(registro.getChave());
+                // A BST não exige remoção física (enunciado, seção 4.2).
             }
         }
     }
 
     /**
-     * Insere o par na BST quando chave e valor sao numericos (timestamp/leitura).
-     * Entradas nao numericas ficam apenas no HashMap.
+     * Indexa um par no índice secundário (BST) quando chave e valor são
+     * numéricos (timestamp inteiro e leitura real). Pares fora desse domínio
+     * permanecem apenas no índice primário.
+     *
+     * @param chave chave a interpretar como timestamp
+     * @param valor valor a interpretar como leitura
      */
     private void indexarNaBST(String chave, String valor) {
         try {
@@ -50,27 +81,30 @@ public class Telemetria implements SGBD {
             double leitura = Double.parseDouble(valor.trim());
             raizBST = NoBST.inserir(raizBST, timestamp, leitura);
         } catch (NumberFormatException e) {
-            // Chave/valor fora do dominio numerico: ignora o indice ordenado.
+            // Chave/valor não numéricos: não participam do índice ordenado.
         }
     }
 
     @Override
     public void put(String chave, String valor) {
-        log.anexar(new RegistroLog(TipoOperacao.PUT, chave, valor));
-        mapa.put(chave, valor);
+        Objects.requireNonNull(chave, "chave");
+        Objects.requireNonNull(valor, "valor");
+        log.anexar(RegistroLog.put(chave, valor)); // persiste antes de aplicar
+        indicePrimario.put(chave, valor);
         indexarNaBST(chave, valor);
     }
 
     @Override
     public String get(String chave) {
-        return mapa.get(chave);
+        return indicePrimario.get(chave);
     }
 
     @Override
     public void delete(String chave) {
-        log.anexar(new RegistroLog(TipoOperacao.DEL, chave, null));
-        mapa.remove(chave);
-        // Remocao fisica na BST nao e exigida (ver enunciado, secao 4.2).
+        Objects.requireNonNull(chave, "chave");
+        log.anexar(RegistroLog.del(chave)); // persiste antes de aplicar
+        indicePrimario.remove(chave);
+        // Remoção física na BST não é exigida (enunciado, seção 4.2).
     }
 
     @Override
@@ -79,16 +113,24 @@ public class Telemetria implements SGBD {
     }
 
     /**
-     * Metodo auxiliar do dominio: grava uma leitura numerica convertendo
-     * para o contrato publico put(String, String).
+     * Método auxiliar do domínio: grava uma leitura numérica convertendo para
+     * o contrato público {@link #put(String, String)}.
+     *
+     * @param timestamp instante da leitura
+     * @param valor leitura do sensor
      */
     public void gravarLeitura(int timestamp, double valor) {
         put(String.valueOf(timestamp), String.valueOf(valor));
     }
 
     /**
-     * Funcionalidade especifica do grupo: soma das leituras cujos timestamps
-     * estao em [inicio, fim], usando a BST (indice ordenado por tempo).
+     * Funcionalidade específica do grupo: soma das leituras cujos timestamps
+     * pertencem ao intervalo fechado {@code [inicio, fim]}, calculada sobre o
+     * índice secundário (BST).
+     *
+     * @param inicio limite inferior da faixa (inclusive)
+     * @param fim limite superior da faixa (inclusive)
+     * @return a soma das leituras na faixa
      */
     public double consultarSoma(int inicio, int fim) {
         return NoBST.somarFaixa(raizBST, inicio, fim);
