@@ -1,0 +1,6 @@
+# Artefatos de compilacao Java
+out/
+*.class
+
+# Dados gerados em runtime pelo log append-only
+dados.log
