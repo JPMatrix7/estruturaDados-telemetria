@@ -5,9 +5,21 @@ em disco (log append-only) e uma **BST (árvore binária de busca)** usada como
 índice ordenado por timestamp para consultas de soma em faixa.
 
 - **Disciplina:** Estrutura de Dados — UNITINS — 2026.1
+- **Grupo:** 07 — Telemetria IoT
 - **Domínio:** leituras numéricas de um sensor IoT
   - **Chave:** timestamp da leitura (String que representa um inteiro, ex.: `"100"`)
   - **Valor:** leitura do sensor gravada como String (ex.: `"23.5"`)
+
+## Integrantes e divisão de tarefas
+
+| Integrante | Participação | Responsabilidades |
+|---|---|---|
+| **João Pedro** *(responsável principal)* | ~60% | Núcleo do banco e API (`SGBD`, `Telemetria` — integração `HashMap` + BST); estrutura específica do grupo (`NoBST`: `inserir` e `somarFaixa`) e a funcionalidade `consultarSoma`; programa de demonstração (`DemoGrupo07`). |
+| **Leonardo** | ~40% | Camada de persistência (`RegistroLog`, `LogAppendOnly`: log append-only com `flush` + `fsync`); reconstrução do estado na inicialização; documentação (`README.md`). |
+
+> A divisão segue a sugestão do enunciado para grupos de 2 alunos (Aluno 1:
+> API + integração da BST + demonstração; Aluno 2: log + reconstrução + README),
+> com o responsável principal concentrando a maior carga (núcleo e estrutura).
 
 ## Como compilar e executar
 
