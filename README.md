@@ -12,14 +12,10 @@ em disco (log append-only) e uma **BST (árvore binária de busca)** usada como
 
 ## Integrantes e divisão de tarefas
 
-| Integrante | Participação | Responsabilidades |
-|---|---|---|
-| **João Pedro** *(responsável principal)* | ~60% | Núcleo do banco e API (`SGBD`, `Telemetria` — integração `HashMap` + BST); estrutura específica do grupo (`NoBST`: `inserir` e `somarFaixa`) e a funcionalidade `consultarSoma`; programa de demonstração (`DemoGrupo07`). |
-| **Leonardo** | ~40% | Camada de persistência (`RegistroLog`, `LogAppendOnly`: log append-only com `flush` + `fsync`); reconstrução do estado na inicialização; documentação (`README.md`). |
-
-> A divisão segue a sugestão do enunciado para grupos de 2 alunos (Aluno 1:
-> API + integração da BST + demonstração; Aluno 2: log + reconstrução + README),
-> com o responsável principal concentrando a maior carga (núcleo e estrutura).
+| Integrante | Responsabilidades |
+|---|---|
+| **João Pedro** | Núcleo do banco e API (`SGBD`, `Telemetria` — integração `HashMap` + BST); estrutura específica do grupo (`NoBST`: `inserir` e `somarFaixa`) e a funcionalidade `consultarSoma`; programa de demonstração (`DemoGrupo07`). |
+| **Leonardo** | Camada de persistência (`RegistroLog`, `LogAppendOnly`: log append-only com `flush` + `fsync`); reconstrução do estado na inicialização; documentação (`README.md`). |
 
 ## Como compilar e executar
 
